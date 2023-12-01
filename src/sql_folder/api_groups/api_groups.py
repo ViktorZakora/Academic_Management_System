@@ -1,7 +1,7 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_restful import Api, Resource
 from sqlalchemy import func
-from src.sql_folder.create_tables import db, Group, Student, Course, student_course_association
+from src.sql_folder.create_tables import db, Group, Student
 
 api_groups = Blueprint('api_groups', __name__)
 
@@ -44,6 +44,45 @@ class Groups(Resource):
             return {'groups': result}, 200
         else:
             return {'message': 'No groups found.'}, 404
+
+    def post(self):
+        """
+        Add a new group.
+
+        This endpoint allows you to add a new group.
+
+        ---
+        tags:
+          - Groups
+        parameters:
+          - name: name
+            in: query
+            type: string
+            required: true
+            description: The name of the new group.
+        responses:
+          201:
+            description: Group added successfully.
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  default: The group has been successfully added.
+          409:
+            description: Group with the specified name already exists.
+        """
+        name = request.args.get('name')
+        existing_group = Group.query.filter_by(name=name).first()
+
+        if existing_group:
+            return {'message': 'Group with the specified name already exists.'}, 409
+
+        new_group = Group(name=name)
+        db.session.add(new_group)
+        db.session.commit()
+
+        return {'message': 'The group has been successfully added.'}, 201
 
 
 class GroupId(Resource):
@@ -119,9 +158,7 @@ class GroupId(Resource):
         else:
             return {'message': 'Group not found.'}, 404
 
-
-class GroupUpdate(Resource):
-    def put(self, group_id, name):
+    def put(self, group_id):
         """
         Update a group by group_id.
 
@@ -137,7 +174,7 @@ class GroupUpdate(Resource):
             required: true
             description: The ID of the group to be updated.
           - name: name
-            in: path
+            in: query
             type: string
             required: true
             description: The updated name of the group.
@@ -153,6 +190,7 @@ class GroupUpdate(Resource):
           404:
             description: Group not found.
         """
+        name = request.args.get('name')
         group = Group.query.get(group_id)
 
         if group:
@@ -162,52 +200,9 @@ class GroupUpdate(Resource):
         else:
             return {'message': 'Group not found.'}, 404
 
-    def post(self, group_id, name):
-        """
-        Add a new group.
-
-        This endpoint allows you to add a new group.
-
-        ---
-        tags:
-          - Groups
-        parameters:
-          - name: group_id
-            in: path
-            type: integer
-            required: true
-            description: The ID of the new group.
-          - name: name
-            in: path
-            type: string
-            required: true
-            description: The name of the new group.
-        responses:
-          201:
-            description: Group added successfully.
-            schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  default: The group has been successfully added.
-          409:
-            description: Group ID already exists.
-        """
-        existing_group = Group.query.get(group_id)
-
-        if existing_group:
-            return {'message': 'Group ID already exists.'}, 409
-
-        new_group = Group(id=group_id, name=name)
-        db.session.add(new_group)
-        db.session.commit()
-
-        return {'message': 'The group has been successfully added.'}, 201
-
 
 class GroupLessOrEqualStudents(Resource):
-    def get(self, number):
+    def get(self):
         """
         Get groups with less or equal students count.
 
@@ -218,7 +213,7 @@ class GroupLessOrEqualStudents(Resource):
           - Groups
         parameters:
           - name: number
-            in: path
+            in: query
             type: integer
             required: true
             description: The maximum number of students a group can have.
@@ -237,18 +232,14 @@ class GroupLessOrEqualStudents(Resource):
                         type: integer
                       name:
                         type: string
-          404:
-            description: No groups found.
         """
+        number = request.args.get('number')
         groups = Group.query.join(Group.students).group_by(Group.id).having(func.count(Student.id) <= number).all()
 
         if groups:
             return {'groups': [{'id': group.id, 'name': group.name} for group in groups]}, 200
-        else:
-            return {'message': 'No groups found'}, 404
 
 
-api.add_resource(Groups, '/groups',)
+api.add_resource(Groups, '/groups', )
 api.add_resource(GroupId, '/groups/<int:group_id>')
-api.add_resource(GroupUpdate, '/groups/<int:group_id>/<string:name>')
-api.add_resource(GroupLessOrEqualStudents, '/groups/<int:number>')
+api.add_resource(GroupLessOrEqualStudents, '/groups/less-or-equal')

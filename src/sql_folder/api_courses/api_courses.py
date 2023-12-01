@@ -1,6 +1,6 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_restful import Api, Resource
-from src.sql_folder.create_tables import db, Student, Course
+from src.sql_folder.create_tables import db, Student, Course, student_course_association
 
 api_courses = Blueprint('api_courses', __name__)
 
@@ -40,9 +40,48 @@ class Courses(Resource):
 
         if courses:
             result = [[course.id, course.name] for course in courses]
-            return {'coursess': result}, 200
+            return {'courses': result}, 200
         else:
             return {'message': 'No courses found.'}, 404
+
+    def post(self):
+        """
+        Add a new course.
+
+        This endpoint allows you to add a new course.
+
+        ---
+        tags:
+          - Courses
+        parameters:
+          - name: name
+            in: query
+            type: string
+            required: true
+            description: The name of the new course.
+        responses:
+          201:
+            description: Course added successfully.
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  default: The course has been successfully added.
+          409:
+            description: Course with the specified name already exists.
+        """
+        name = request.args.get('name')
+        existing_course = Course.query.filter_by(name=name).first()
+
+        if existing_course:
+            return {'message': 'Course with the specified name already exists.'}, 409
+
+        new_course = Course(name=name)
+        db.session.add(new_course)
+        db.session.commit()
+
+        return {'message': 'The course has been successfully added.'}, 201
 
 
 class CourseId(Resource):
@@ -118,9 +157,7 @@ class CourseId(Resource):
         else:
             return {'message': 'Course not found.'}, 404
 
-
-class CourseUpdate(Resource):
-    def put(self, course_id, name):
+    def put(self, course_id):
         """
         Update a course by course_id.
 
@@ -136,7 +173,7 @@ class CourseUpdate(Resource):
             required: true
             description: The ID of the course to be updated.
           - name: name
-            in: path
+            in: query
             type: string
             required: true
             description: The updated name of the course.
@@ -152,6 +189,7 @@ class CourseUpdate(Resource):
           404:
             description: Course not found.
         """
+        name = request.args.get('name')
         course = Course.query.get(course_id)
 
         if course:
@@ -161,96 +199,62 @@ class CourseUpdate(Resource):
         else:
             return {'message': 'Course not found.'}, 404
 
-    def post(self, course_id, name):
-        """
-        Add a new course.
 
-        This endpoint allows you to add a new course.
+class CourseToStudents(Resource):
+    def get(self):
+        """
+        Get students related to the course.
+
+        This endpoint returns a list of students related to the course with a given name.
 
         ---
         tags:
           - Courses
         parameters:
-          - name: course_id
-            in: path
-            type: integer
-            required: true
-            description: The ID of the new course.
-          - name: name
-            in: path
+          - name: name_course
+            in: query
             type: string
             required: true
-            description: The name of the new course.
-        responses:
-          201:
-            description: Course added successfully.
-            schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  default: The course has been successfully added.
-          409:
-            description: Course ID already exists.
-        """
-        existing_course = Course.query.get(course_id)
-
-        if existing_course:
-            return {'message': 'Course ID already exists.'}, 409
-
-        new_course = Course(id=course_id, name=name)
-        db.session.add(new_course)
-        db.session.commit()
-
-        return {'message': 'The course has been successfully added.'}, 201
-
-
-class CoursesByStudent(Resource):
-    def get(self, student_id):
-        """
-        Get courses for a student.
-
-        This endpoint returns a list of courses associated with a student based on student_id.
-
-        ---
-        tags:
-          - Courses
-        parameters:
-          - name: student_id
-            in: path
-            type: integer
-            required: true
-            description: The ID of the student.
+            description: The name of the course.
         responses:
           200:
-            description: List of courses for the student.
+            description: List of students related to the course.
             schema:
               type: object
               properties:
-                courses:
+                students:
                   type: array
                   items:
                     type: object
                     properties:
                       id:
                         type: integer
-                      name:
+                      first_name:
                         type: string
-                      description:
+                      last_name:
                         type: string
           404:
-            description: Student not found.
+            description: No students found for the given course name.
         """
-        student = Student.query.get(student_id)
+        name_course = request.args.get('name_course')
+        course = Course.query.filter_by(name=name_course).first()
 
-        if not student:
-            return {'message': 'Student not found.'}, 404
+        if not course:
+            return {'message': f'Course not found with the name: {name_course}'}, 404
 
-        courses = [{'id': course.id, 'name': course.name, 'description': course.description} for course in student.courses]
-        return {'courses': courses}, 200
+        students = db.session.query(Student.id, Student.first_name, Student.last_name) \
+            .join(student_course_association) \
+            .join(Course) \
+            .filter(Course.name == name_course) \
+            .all()
+
+        if students:
+            result = [{student.id: [student.first_name, student.last_name]} for student in students]
+            return {'students': result}, 200
+        else:
+            return {'message': f'No students found for the given course name: {name_course}.'}, 409
 
 
-api.add_resource(Courses, '/courses',)
+api.add_resource(Courses, '/courses')
 api.add_resource(CourseId, '/courses/<int:course_id>')
-api.add_resource(CourseUpdate, '/courses/<int:course_id>/<string:name>')
-api.add_resource(CoursesByStudent, '/courses/courses-by-student/<int:student_id>')
+api.add_resource(CourseToStudents, '/courses/course-to-students')

@@ -1,160 +1,199 @@
-# import pytest
-# from src.sql_folder.sql_file import create_app
-# from src.sql_folder.create_tables import TestConfig, Report, database_proxy
-#
-#
-# @pytest.fixture
-# def client():
-#     app = create_app(TestConfig)
-#     client = app.test_client()
-#
-#     database_proxy.create_tables([Report])
-#
-#     Report.create(
-#         abbreviation='PGS',
-#         driver='John Doe',
-#         team='Team A',
-#         time='2023-11-12 12:00:00'
-#     )
-#
-#     yield client
-#
-#
-# def test_index(client):
-#     response = client.get('/')
-#     assert response.status_code == 200
-#     assert b"Monaco 2018 Racin" in response.data
-#
-#
-# def test_report(client):
-#     response = client.get('/report')
-#     assert response.status_code == 200
-#     assert b"Report" in response.data
-#
-#
-# def test_all_drivers(client):
-#     response = client.get('/report/all_drivers')
-#     assert response.status_code == 200  # перевірка коду стану
-#     assert b"All drivers" in response.data
-#
-#
-# def test_process_data_2(client):
-#     response = client.get('/report/all_drivers/process_data_2?key=John Doe')
-#     assert response.status_code == 200
-#     assert 'PGS' in response.get_data(as_text=True)  # чи ключ відображається на сторінці
-#     assert 'John Doe' in response.get_data(as_text=True)  # чи значення відображається на сторінці
-#
-#
-# def test_driver(client):
-#     response = client.get('/driver')
-#     assert response.status_code == 200
-#
-#
-# def test_process_data(client):
-#     response = client.post('/driver/process_data', data={'key': 'PGS'})
-#     assert response.status_code == 200
-#     assert 'PGS' in response.get_data(as_text=True)  # чи ключ відображається на сторінці
-#     assert 'John Doe' in response.get_data(as_text=True)  # чи значення відображається на сторінці
-#     assert 'Such a driver did not participate in the competition.' not in response.get_data(as_text=True)  # чи помилка не відображається
-#
-#
-# def test_api_report_json(client):
-#     response = client.get('http://localhost:5000/v1/report/?format=json')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/json'
-#     assert response.json['PGS'] == ['John Doe', 'Team A', 'Sun, 12 Nov 2023 12:00:00 GMT']
-#     assert response.json == {'PGS': ['John Doe', 'Team A', 'Sun, 12 Nov 2023 12:00:00 GMT']}
-#     # Перевірка вмісту JSON відповіді
-#
-#
-# def test_api_report_xml(client):
-#     response = client.get('http://localhost:5000/v1/report/?format=xml')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/xml; charset=utf-8'
-#     # Перевірка вмісту XML відповіді
-#
-#
-# def test_api_report_error(client):
-#     response = client.get('http://localhost:5000/v1/report/?format=html')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/json'
-#     assert response.data == b'{"Error":"Unsupported format"}\n'
-#     # Перевірка вмісту Error відповіді
-#
-#
-# def test_api_all_drivers_json(client):
-#     response = client.get('http://127.0.0.1:5000/v1/report/all_drivers/?format=json')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/json'
-#     assert response.json['PGS'] == 'John Doe'
-#     # Перевірка вмісту JSON відповіді
-#
-#
-# def test_api_all_drivers_xml(client):
-#     response = client.get('http://127.0.0.1:5000/v1/report/all_drivers/?format=xml')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/xml; charset=utf-8'
-#     # Перевірка вмісту XML відповіді
-#
-#
-# def test_api_all_drivers_error(client):
-#     response = client.get('http://127.0.0.1:5000/v1/report/all_drivers/?format=html')
-#     assert response.status_code == 200
-#     assert response.content_type == 'application/json'
-#     assert response.data == b'{"Error":"Unsupported format"}\n'
-#     # Перевірка вмісту Error відповіді
-#
-# def test_insert_report(client):
-#     reports = Report.select()
-#     assert reports.count() == 1
-#     report = reports[0]
-#     assert report.abbreviation == 'PGS'
-#     assert report.driver == 'John Doe'
-#     assert report.team == 'Team A'
-#     assert str(report.time) == '2023-11-12 12:00:00'
-#
-#
-# if __name__ == '__main__':
-#     pytest.main()
-
 import pytest
-from src.sql_folder.create_tables import app, db, Group, Student, Course
+import re
+
+from src.sql_folder.add_data import generate_groups, generate_courses
+from src.sql_folder.create_tables import db, Group, Student, Course, TestConfig
+from src.sql_folder.sql_file import create_app
 
 
 @pytest.fixture
 def client():
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = ":memory:"
+    app = create_app(TestConfig)
+
     with app.test_client() as client:
         with app.app_context():
             db.create_all()
+            # Додайте тестові дані до фіктивної бази даних
+            student1 = Student(first_name='John', last_name='Doe')
+            student2 = Student(first_name='Jane', last_name='Smith')
+            course1 = Course(name='Math')
+            course2 = Course(name='Science')
+            course3 = Course(name='Physics')
+            course4 = Course(name='Flask')
+            group1 = Group(name='CV-42')
+            group2 = Group(name='HB-17')
+            course1.students.append(student1)
+            course2.students.append(student2)
+            course3.students.append(student2)
+            group1.students.append(student1)
+            group2.students.append(student2)
+            db.session.add_all([student1, student2, course1, course2, course3, course4, group1, group2])
+            db.session.commit()
             yield client
+            db.session.remove()
             db.drop_all()
 
-def test_students_by_course(client):
-    # Add a course and some students
-    course = Course(name='Math')
-    db.session.add(course)
-    db.session.commit()
-    student1 = Student(first_name='John', last_name='Doe')
-    student2 = Student(first_name='Jane', last_name='Doe')
-    student3 = Student(first_name='Bob', last_name='Smith')
-    db.session.add_all([student1, student2, student3])
-    db.session.commit()
-    course.students.append(student1)
-    course.students.append(student2)
-    db.session.commit()
 
-    # Test with existing course
-    response = client.get('/student/by_course/Math')
+def test_courses(client):
+    response = client.get('/courses')
     assert response.status_code == 200
-    assert response.json == {'students': [{'id': student1.id, 'first_name': 'John', 'last_name': 'Doe'}, {'id': student2.id, 'first_name': 'Jane', 'last_name': 'Doe'}]}
+    assert response.json == {'courses': [[1, 'Math'], [2, 'Science'], [3, 'Physics'], [4, 'Flask']]}
 
-    # Test with non-existing course
-    response = client.get('/student/by_course/History')
+    response = client.post('/courses', query_string={'name': 'Python'})
+    assert response.status_code == 201
+    assert response.json == {'message': 'The course has been successfully added.'}
+
+    response = client.post('/courses', query_string={'name': 'Python'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'Course with the specified name already exists.'}
+
+    response = client.get('/courses/1')
+    assert response.status_code == 200
+    assert response.json == [1, 'Math']
+
+    response = client.get('/courses/10')
     assert response.status_code == 404
-    assert response.json == {'message': 'No students found for the given course name (History).'}
+    assert response.json == {'message': 'Course not found.'}
 
+    response = client.delete('/courses/5')
+    assert response.status_code == 200
+    assert response.json == {'message': 'The course has been successfully deleted.'}
+
+    response = client.delete('/courses/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Course not found.'}
+
+    response = client.put('/courses/2', query_string={'name': 'Java'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The course has been successfully updated.'}
+
+    response = client.put('/courses/10', query_string={'name': 'Java'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Course not found.'}
+
+    response = client.get('/courses/course-to-students', query_string={'name_course': 'Art'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Course not found with the name: Art'}
+
+    response = client.get('/courses/course-to-students', query_string={'name_course': 'Physics'})
+    assert response.status_code == 200
+    assert response.json == {'students': [{'2': ['Jane', 'Smith']}]}
+
+    response = client.get('/courses/course-to-students', query_string={'name_course': 'Flask'})
+    assert response.status_code == 409
+    assert response.json == {'message': f'No students found for the given course name: Flask.'}
+
+
+def test_groups(client):
+    response = client.get('/groups')
+    assert response.status_code == 200
+    assert response.json == {'groups': [[1, 'CV-42'], [2, 'HB-17']]}
+
+    response = client.post('/groups', query_string={'name': 'QW-27'})
+    assert response.status_code == 201
+    assert response.json == {'message': 'The group has been successfully added.'}
+
+    response = client.post('/groups', query_string={'name': 'QW-27'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'Group with the specified name already exists.'}
+
+    response = client.get('/groups/1')
+    assert response.status_code == 200
+    assert response.json == [1, 'CV-42']
+
+    response = client.get('/groups/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.delete('/groups/3')
+    assert response.status_code == 200
+    assert response.json == {'message': 'The group has been successfully deleted.'}
+
+    response = client.delete('/groups/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.put('/groups/1', query_string={'name': 'DB-27'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The group has been successfully updated.'}
+
+    response = client.put('/groups/10', query_string={'name': 'DB-27'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.get('/groups/less-or-equal', query_string={'number': '2'})
+    assert response.status_code == 200
+    assert response.json == {'groups': [{'id': 1, 'name': 'DB-27'}, {'id': 2, 'name': 'HB-17'}]}
+
+
+def test_students(client):
+    response = client.get('/students')
+    assert response.status_code == 200
+    assert response.json == {'students': [[1, 'John', 'Doe'], [2, 'Jane', 'Smith']]}
+
+    response = client.post('/students', query_string={'first_name': 'Alice', 'last_name': 'Johnson'})
+    assert response.status_code == 201
+    assert response.json == {'message': 'The student has been successfully added.'}
+
+    response = client.post('/students', query_string={'first_name': 'Alice', 'last_name': 'Johnson'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'Student with the specified first_name and last_name already exists.'}
+
+    response = client.get('/students/1')
+    assert response.status_code == 200
+    assert response.json == [1, 'John', 'Doe']
+
+    response = client.get('/students/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.delete('/students/3')
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully deleted.'}
+
+    response = client.delete('/students/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.put('/students/2', query_string={'first_name': 'Bob', 'last_name': 'Marley'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully updated.'}
+
+    response = client.put('/students/10', query_string={'first_name': 'Bob', 'last_name': 'Marley'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.get('/students/10/student-to-course')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.get('/students/1/student-to-course')
+    assert response.status_code == 200
+    assert response.json == {'courses': [{'id': 1, 'name': 'Math', 'description': None}]}
+
+    response = client.post('/students/10/student-to-course', query_string={'name_course': 'Science'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.post('/students/2/student-to-course', query_string={'name_course': 'Math'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully added to the course.'}
+
+    response = client.post('/students/2/student-to-course', query_string={'name_course': 'Science'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is already enrolled in the course.'}
+
+    response = client.delete('/students/10/student-to-course', query_string={'name_course': 'Science'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student or course not found.'}
+
+    response = client.delete('/students/2/student-to-course', query_string={'name_course': 'Math'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully removed from the course.'}
+
+    response = client.delete('/students/2/student-to-course', query_string={'name_course': 'Math'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is not enrolled in the course.'}
 
 
 if __name__ == '__main__':

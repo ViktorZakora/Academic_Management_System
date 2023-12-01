@@ -1,7 +1,6 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_restful import Api, Resource
-from sqlalchemy import func
-from src.sql_folder.create_tables import db, Group, Student, Course, student_course_association
+from src.sql_folder.create_tables import db, Student, Course
 
 api_students = Blueprint('api_students', __name__)
 
@@ -32,9 +31,7 @@ class Students(Resource):
                     properties:
                       id:
                         type: integer
-                      first_name:
-                        type: string
-                      last_name:
+                      name:
                         type: string
           404:
             description: No students found.
@@ -46,6 +43,51 @@ class Students(Resource):
             return {'students': result}, 200
         else:
             return {'message': 'No students found.'}, 404
+
+    def post(self):
+        """
+        Add a new student.
+
+        This endpoint allows you to add a new student.
+
+        ---
+        tags:
+          - Students
+        parameters:
+          - name: first_name
+            in: query
+            type: string
+            required: true
+            description: The first name of the new student.
+          - name: last_name
+            in: query
+            type: string
+            required: true
+            description: The last name of the new student.
+        responses:
+          201:
+            description: Student added successfully.
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  default: The student has been successfully added.
+          409:
+            description: Student with the specified name already exists.
+        """
+        first_name = request.args.get('first_name')
+        last_name = request.args.get('last_name')
+        existing_student = Student.query.filter_by(first_name=first_name, last_name=last_name).first()
+
+        if existing_student:
+            return {'message': 'Student with the specified first_name and last_name already exists.'}, 409
+
+        new_student = Student(first_name=first_name, last_name=last_name)
+        db.session.add(new_student)
+        db.session.commit()
+
+        return {'message': 'The student has been successfully added.'}, 201
 
 
 class StudentId(Resource):
@@ -72,9 +114,7 @@ class StudentId(Resource):
               properties:
                 id:
                   type: integer
-                first_name:
-                  type: string
-                last_name:
+                name:
                   type: string
           404:
             description: Student not found.
@@ -123,9 +163,7 @@ class StudentId(Resource):
         else:
             return {'message': 'Student not found.'}, 404
 
-
-class StudentUpdate(Resource):
-    def put(self, student_id, first_name, last_name):
+    def put(self, student_id):
         """
         Update a student by student_id.
 
@@ -139,17 +177,17 @@ class StudentUpdate(Resource):
             in: path
             type: integer
             required: true
-            description: The ID of the student to be updated.
+            description: The ID of the group to be updated.
           - name: first_name
-            in: path
+            in: query
             type: string
             required: true
-            description: The updated first name of the student.
+            description: The updated first_name of the student.
           - name: last_name
-            in: path
+            in: query
             type: string
             required: true
-            description: The updated last name of the student.
+            description: The updated last_name of the student.
         responses:
           200:
             description: Student updated successfully.
@@ -162,6 +200,8 @@ class StudentUpdate(Resource):
           404:
             description: Student not found.
         """
+        first_name = request.args.get('first_name')
+        last_name = request.args.get('last_name')
         student = Student.query.get(student_id)
 
         if student:
@@ -172,11 +212,13 @@ class StudentUpdate(Resource):
         else:
             return {'message': 'Student not found.'}, 404
 
-    def post(self, student_id, first_name, last_name):
-        """
-        Add a new student.
 
-        This endpoint allows you to add a new student.
+class StudentToCourse(Resource):
+    def get(self, student_id):
+        """
+        Get courses for a student.
+
+        This endpoint returns a list of courses associated with a student based on student_id.
 
         ---
         tags:
@@ -186,43 +228,37 @@ class StudentUpdate(Resource):
             in: path
             type: integer
             required: true
-            description: The ID of the new student.
-          - name: first_name
-            in: path
-            type: string
-            required: true
-            description: The first name of the new student.
-          - name: last_name
-            in: path
-            type: string
-            required: true
-            description: The last name of the new student.
+            description: The ID of the student.
         responses:
-          201:
-            description: Student added successfully.
+          200:
+            description: List of courses for the student.
             schema:
               type: object
               properties:
-                message:
-                  type: string
-                  default: The student has been successfully added.
-          409:
-            description: Student ID already exists.
+                courses:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      description:
+                        type: string
+          404:
+            description: Student not found.
         """
-        existing_student = Student.query.get(student_id)
+        student = Student.query.get(student_id)
 
-        if existing_student:
-            return {'message': 'Student ID already exists.'}, 409
+        if not student:
+            return {'message': 'Student not found.'}, 404
 
-        new_student = Student(id=student_id, first_name=first_name, last_name=last_name)
-        db.session.add(new_student)
-        db.session.commit()
+        courses = [{'id': course.id, 'name': course.name, 'description': course.description} for course in
+                   student.courses]
+        return {'courses': courses}, 200
 
-        return {'message': 'The student has been successfully added.'}, 201
-
-
-class StudentToCourse(Resource):
-    def post(self, student_id, name_course):
+    def post(self, student_id):
         """
         Add a student to the course.
 
@@ -238,10 +274,21 @@ class StudentToCourse(Resource):
             required: true
             description: The ID of the student to be added to the course.
           - name: name_course
-            in: path
+            in: query
             type: string
             required: true
             description: The name of the course to which the student will be added.
+            enum:
+              - Mathematics
+              - Biology
+              - Physics
+              - Chemistry
+              - History
+              - English
+              - Informatics
+              - Art
+              - Music
+              - Geography
         responses:
           200:
             description: Student added to the course successfully.
@@ -252,11 +299,12 @@ class StudentToCourse(Resource):
                   type: string
                   default: The student has been successfully added to the course.
           404:
-            description: Student or course not found.
+            description: Student not found.
           409:
             description: The student is already enrolled in the course.
         """
         student = Student.query.get(student_id)
+        name_course = request.args.get('name_course')
         course = Course.query.filter_by(name=name_course).first()
 
         if student and course:
@@ -267,9 +315,9 @@ class StudentToCourse(Resource):
             db.session.commit()
             return {'message': 'The student has been successfully added to the course.'}, 200
         else:
-            return {'message': 'Student or course not found.'}, 404
+            return {'message': 'Student not found.'}, 404
 
-    def delete(self, student_id, name_course):
+    def delete(self, student_id):
         """
         Remove a student from the course.
 
@@ -285,7 +333,7 @@ class StudentToCourse(Resource):
             required: true
             description: The ID of the student to be removed from the course.
           - name: name_course
-            in: path
+            in: query
             type: string
             required: true
             description: The name of the course from which the student will be removed.
@@ -304,6 +352,7 @@ class StudentToCourse(Resource):
             description: The student is not enrolled in the course.
         """
         student = Student.query.get(student_id)
+        name_course = request.args.get('name_course')
         course = Course.query.filter_by(name=name_course).first()
 
         if student and course:
@@ -317,53 +366,6 @@ class StudentToCourse(Resource):
             return {'message': 'Student or course not found.'}, 404
 
 
-class StudentsByCourse(Resource):
-    def get(self, name_course):
-        """
-        Get students related to the course.
-
-        This endpoint returns a list of students related to the course with a given name.
-
-        ---
-        tags:
-          - Students
-        parameters:
-          - name: name_course
-            in: path
-            type: string
-            required: true
-            description: The name of the course.
-        responses:
-          200:
-            description: List of students related to the course.
-            schema:
-              type: object
-              properties:
-                students:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      first_name:
-                        type: string
-                      last_name:
-                        type: string
-          404:
-            description: No students found for the given course name.
-        """
-        students = Student.query.join(student_course_association).join(Course).filter(Course.name == name_course).all()
-
-        if students:
-            result = [{'id': student.id, 'first_name': student.first_name, 'last_name': student.last_name} for student in students]
-            return {'students': result}, 200
-        else:
-            return {'message': f'No students found for the given course name ({name_course}).'}, 404
-
-
-api.add_resource(Students, '/students',)
+api.add_resource(Students, '/students', )
 api.add_resource(StudentId, '/students/<int:student_id>')
-api.add_resource(StudentUpdate, '/students/<int:student_id>/<string:first_name>/<string:last_name>')
-api.add_resource(StudentToCourse, '/students/student-to-course/<int:student_id>/<string:name_course>')
-api.add_resource(StudentsByCourse, '/students/student-by-course/<string:name_course>')
+api.add_resource(StudentToCourse, '/students/<int:student_id>/student-to-course')

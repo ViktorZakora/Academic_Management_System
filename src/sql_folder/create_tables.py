@@ -2,9 +2,11 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vik:ubnfhf@localhost/task_10_sql'
-db = SQLAlchemy(app)
+
+# app = Flask(__name__)
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vik:ubnfhf@localhost/task_10_sql'
+db = SQLAlchemy()
+# database_proxy = DatabaseProxy()
 
 
 student_course_association = db.Table(
@@ -48,7 +50,9 @@ class Course(db.Model):
     students = relationship('Student', secondary=student_course_association, back_populates='courses')
 
 
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # створити
-        # db.drop_all()  # видалити
+class TestConfig:
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+
+
+class RealConfig:
+    SQLALCHEMY_DATABASE_URI = 'postgresql://vik:ubnfhf@localhost/task_10_sql'
