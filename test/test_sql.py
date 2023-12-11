@@ -20,12 +20,13 @@ def client():
             course4 = Course(name='Flask')
             group1 = Group(name='CV-42')
             group2 = Group(name='HB-17')
+            group3 = Group(name='NB_98')
             course1.students.append(student1)
             course2.students.append(student2)
             course3.students.append(student2)
             group1.students.append(student1)
             group2.students.append(student2)
-            db.session.add_all([student1, student2, course1, course2, course3, course4, group1, group2])
+            db.session.add_all([student1, student2, course1, course2, course3, course4, group1, group2, group3])
             db.session.commit()
             yield client
             db.session.remove()
@@ -35,7 +36,7 @@ def client():
 def test_courses(client):
     response = client.get('/courses')
     assert response.status_code == 200
-    assert response.json == {'courses': [[1, 'Math'], [2, 'Science'], [3, 'Physics'], [4, 'Flask']]}
+    assert response.json == {'courses': [{'1': 'Math'}, {'2': 'Science'}, {'3': 'Physics'}, {'4': 'Flask'}]}
 
     response = client.post('/courses', query_string={'name': 'Python'})
     assert response.status_code == 201
@@ -47,7 +48,7 @@ def test_courses(client):
 
     response = client.get('/courses/1')
     assert response.status_code == 200
-    assert response.json == [1, 'Math']
+    assert response.json == {'1': 'Math'}
 
     response = client.get('/courses/10')
     assert response.status_code == 404
@@ -69,23 +70,51 @@ def test_courses(client):
     assert response.status_code == 404
     assert response.json == {'message': 'Course not found.'}
 
-    response = client.get('/courses/course-to-students', query_string={'name_course': 'Art'})
+    response = client.get('/courses/10/students')
     assert response.status_code == 404
-    assert response.json == {'message': 'Course not found with the name: Art'}
+    assert response.json == {'message': 'Course not found.'}
 
-    response = client.get('/courses/course-to-students', query_string={'name_course': 'Physics'})
+    response = client.get('/courses/1/students')
     assert response.status_code == 200
-    assert response.json == {'students': [{'2': ['Jane', 'Smith']}]}
+    assert response.json == {'students': [{'1': ['John', 'Doe']}]}
 
-    response = client.get('/courses/course-to-students', query_string={'name_course': 'Flask'})
+    response = client.post('/courses/10/students', query_string={'student_id': '1'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Course not found.'}
+
+    response = client.post('/courses/1/students', query_string={'student_id': '10'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.post('/courses/1/students', query_string={'student_id': '1'})
     assert response.status_code == 409
-    assert response.json == {'message': f'No students found for the given course name: Flask.'}
+    assert response.json == {'message': 'The student is already enrolled in the course.'}
+
+    response = client.post('/courses/1/students', query_string={'student_id': '2'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully added to the course.'}
+
+    response = client.delete('/courses/10/students/1')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Course not found.'}
+
+    response = client.delete('/courses/1/students/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.delete('/courses/2/students/1')
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is not enrolled in the course.'}
+
+    response = client.delete('/courses/1/students/1')
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully removed from the course.'}
 
 
 def test_groups(client):
     response = client.get('/groups')
     assert response.status_code == 200
-    assert response.json == {'groups': [[1, 'CV-42'], [2, 'HB-17']]}
+    assert response.json == {'groups': [{'1': 'CV-42'}, {'2': 'HB-17'}, {'3': 'NB_98'}]}
 
     response = client.post('/groups', query_string={'name': 'QW-27'})
     assert response.status_code == 201
@@ -95,9 +124,13 @@ def test_groups(client):
     assert response.status_code == 409
     assert response.json == {'message': 'Group with the specified name already exists.'}
 
+    response = client.get('/groups', query_string={'count': '2'})
+    assert response.status_code == 200
+    assert response.json == {'groups': [{'1': 'CV-42'}, {'2': 'HB-17'}, {'3': 'NB_98'}, {'4': 'QW-27'}]}
+
     response = client.get('/groups/1')
     assert response.status_code == 200
-    assert response.json == [1, 'CV-42']
+    assert response.json == {'1': 'CV-42'}
 
     response = client.get('/groups/10')
     assert response.status_code == 404
@@ -119,15 +152,55 @@ def test_groups(client):
     assert response.status_code == 404
     assert response.json == {'message': 'Group not found.'}
 
-    response = client.get('/groups/less-or-equal', query_string={'number': '2'})
+    response = client.get('/groups/10/students')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.get('/groups/1/students')
     assert response.status_code == 200
-    assert response.json == {'groups': [{'id': 1, 'name': 'DB-27'}, {'id': 2, 'name': 'HB-17'}]}
+    assert response.json == {'students': [{'1': ['John', 'Doe']}]}
+
+    response = client.post('/groups/10/students', query_string={'student_id': '1'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.post('/groups/1/students', query_string={'student_id': '10'})
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.post('/groups/1/students', query_string={'student_id': '1'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is already enrolled in the group.'}
+
+    response = client.post('/groups/1/students', query_string={'student_id': '2'})
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is already enrolled in another group.'}
+
+    response = client.delete('/groups/10/students/1')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Group not found.'}
+
+    response = client.delete('/groups/1/students/10')
+    assert response.status_code == 404
+    assert response.json == {'message': 'Student not found.'}
+
+    response = client.delete('/groups/2/students/1')
+    assert response.status_code == 409
+    assert response.json == {'message': 'The student is not enrolled in the group.'}
+
+    response = client.delete('/groups/1/students/1')
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully removed from the group.'}
+
+    response = client.post('/groups/1/students', query_string={'student_id': '1'})
+    assert response.status_code == 200
+    assert response.json == {'message': 'The student has been successfully added to the group.'}
 
 
 def test_students(client):
     response = client.get('/students')
     assert response.status_code == 200
-    assert response.json == {'students': [[1, 'John', 'Doe'], [2, 'Jane', 'Smith']]}
+    assert response.json == {'students': [{'1': ['John', 'Doe']}, {'2': ['Jane', 'Smith']}]}
 
     response = client.post('/students', query_string={'first_name': 'Alice', 'last_name': 'Johnson'})
     assert response.status_code == 201
@@ -139,7 +212,7 @@ def test_students(client):
 
     response = client.get('/students/1')
     assert response.status_code == 200
-    assert response.json == [1, 'John', 'Doe']
+    assert response.json == {'1': ['John', 'Doe']}
 
     response = client.get('/students/10')
     assert response.status_code == 404
@@ -161,37 +234,13 @@ def test_students(client):
     assert response.status_code == 404
     assert response.json == {'message': 'Student not found.'}
 
-    response = client.get('/students/10/student-to-course')
+    response = client.get('/students/10/courses')
     assert response.status_code == 404
     assert response.json == {'message': 'Student not found.'}
 
-    response = client.get('/students/1/student-to-course')
+    response = client.get('/students/1/courses')
     assert response.status_code == 200
-    assert response.json == {'courses': [{'id': 1, 'name': 'Math', 'description': None}]}
-
-    response = client.post('/students/10/student-to-course', query_string={'name_course': 'Science'})
-    assert response.status_code == 404
-    assert response.json == {'message': 'Student not found.'}
-
-    response = client.post('/students/2/student-to-course', query_string={'name_course': 'Math'})
-    assert response.status_code == 200
-    assert response.json == {'message': 'The student has been successfully added to the course.'}
-
-    response = client.post('/students/2/student-to-course', query_string={'name_course': 'Science'})
-    assert response.status_code == 409
-    assert response.json == {'message': 'The student is already enrolled in the course.'}
-
-    response = client.delete('/students/10/student-to-course', query_string={'name_course': 'Science'})
-    assert response.status_code == 404
-    assert response.json == {'message': 'Student or course not found.'}
-
-    response = client.delete('/students/2/student-to-course', query_string={'name_course': 'Math'})
-    assert response.status_code == 200
-    assert response.json == {'message': 'The student has been successfully removed from the course.'}
-
-    response = client.delete('/students/2/student-to-course', query_string={'name_course': 'Math'})
-    assert response.status_code == 409
-    assert response.json == {'message': 'The student is not enrolled in the course.'}
+    assert response.json == {'courses': [{'1': ['Math', None]}]}
 
 
 if __name__ == '__main__':

@@ -33,16 +33,12 @@ class Students(Resource):
                         type: integer
                       name:
                         type: string
-          404:
-            description: No students found.
         """
         students = Student.query.all()
 
         if students:
             result = [{student.id: [student.first_name, student.last_name]} for student in students]
             return {'students': result}, 200
-        else:
-            return {'message': 'No students found.'}, 404
 
     def post(self):
         """
@@ -257,114 +253,7 @@ class StudentToCourse(Resource):
         courses = [{course.id: [course.name, course.description]} for course in student.courses]
         return {'courses': courses}, 200
 
-    def post(self, student_id):
-        """
-        Add a student to the course.
-
-        This endpoint allows you to add a student to the course.
-
-        ---
-        tags:
-          - Students
-        parameters:
-          - name: student_id
-            in: path
-            type: integer
-            required: true
-            description: The ID of the student to be added to the course.
-          - name: name_course
-            in: query
-            type: string
-            required: true
-            description: The name of the course to which the student will be added.
-            enum:
-              - Mathematics
-              - Biology
-              - Physics
-              - Chemistry
-              - History
-              - English
-              - Informatics
-              - Art
-              - Music
-              - Geography
-        responses:
-          200:
-            description: Student added to the course successfully.
-            schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  default: The student has been successfully added to the course.
-          404:
-            description: Student not found.
-          409:
-            description: The student is already enrolled in the course.
-        """
-        student = Student.query.get(student_id)
-        name_course = request.args.get('name_course')
-        course = Course.query.filter_by(name=name_course).first()
-
-        if student and course:
-            if student in course.students:
-                return {'message': 'The student is already enrolled in the course.'}, 409
-
-            course.students.append(student)
-            db.session.commit()
-            return {'message': 'The student has been successfully added to the course.'}, 200
-        else:
-            return {'message': 'Student not found.'}, 404
-
-    def delete(self, student_id):
-        """
-        Remove a student from the course.
-
-        This endpoint allows you to remove a student from the course.
-
-        ---
-        tags:
-          - Students
-        parameters:
-          - name: student_id
-            in: path
-            type: integer
-            required: true
-            description: The ID of the student to be removed from the course.
-          - name: name_course
-            in: query
-            type: string
-            required: true
-            description: The name of the course from which the student will be removed.
-        responses:
-          200:
-            description: Student removed from the course successfully.
-            schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  default: The student has been successfully removed from the course.
-          404:
-            description: Student or course not found.
-          409:
-            description: The student is not enrolled in the course.
-        """
-        student = Student.query.get(student_id)
-        name_course = request.args.get('name_course')
-        course = Course.query.filter_by(name=name_course).first()
-
-        if student and course:
-            if student not in course.students:
-                return {'message': 'The student is not enrolled in the course.'}, 409
-
-            course.students.remove(student)
-            db.session.commit()
-            return {'message': 'The student has been successfully removed from the course.'}, 200
-        else:
-            return {'message': 'Student or course not found.'}, 404
-
 
 api.add_resource(Students, '/students', )
 api.add_resource(StudentId, '/students/<int:student_id>')
-api.add_resource(StudentToCourse, '/students/<int:student_id>/student-to-course')
+api.add_resource(StudentToCourse, '/students/<int:student_id>/courses')

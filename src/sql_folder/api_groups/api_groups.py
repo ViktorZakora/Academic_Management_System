@@ -19,6 +19,12 @@ class Groups(Resource):
         ---
         tags:
           - Groups
+        parameters:
+          - name: count
+            in: query
+            type: integer
+            required: false
+            description: The maximum number of students in a group.
         responses:
           200:
             description: List of all groups.
@@ -34,16 +40,18 @@ class Groups(Resource):
                         type: integer
                       name:
                         type: string
-          404:
-            description: No groups found.
         """
+        count = request.args.get('count', type=int)
         groups = Group.query.all()
 
         if groups:
-            result = [{group.id: group.name} for group in groups]
+            if count:
+                filtered_groups = [group for group in groups if len(group.students) <= count]
+                result = [{group.id: group.name} for group in filtered_groups]
+            else:
+                result = [{group.id: group.name} for group in groups]
+
             return {'groups': result}, 200
-        else:
-            return {'message': 'No groups found.'}, 404
 
     def post(self):
         """
@@ -201,45 +209,159 @@ class GroupId(Resource):
             return {'message': 'Group not found.'}, 404
 
 
-class GroupLessOrEqualStudents(Resource):
-    def get(self):
+class GroupToStudents(Resource):
+    def get(self, group_id):
         """
-        Get groups with less or equal students count.
+        Get students for a group.
 
-        This endpoint returns a list of groups with less or equal students count.
+        This endpoint returns a list of students associated with a group based on group_id.
 
         ---
         tags:
           - Groups
         parameters:
-          - name: number
-            in: query
+          - name: group_id
+            in: path
             type: integer
             required: true
-            description: The maximum number of students a group can have.
+            description: The ID of the group.
         responses:
           200:
-            description: List of groups with less or equal students count.
+            description: List of students for the group.
             schema:
               type: object
               properties:
-                groups:
+                students:
                   type: array
                   items:
                     type: object
                     properties:
                       id:
                         type: integer
-                      name:
+                      first_name:
                         type: string
+                      last_name:
+                        type: string
+          404:
+            description: Group not found.
         """
-        number = request.args.get('number')
-        groups = Group.query.join(Group.students).group_by(Group.id).having(func.count(Student.id) <= number).all()
+        group = Group.query.get(group_id)
 
-        if groups:
-            return {'groups': [{group.id: group.name} for group in groups]}, 200
+        if not group:
+            return {'message': 'Group not found.'}, 404
+
+        students = [{student.id: [student.first_name, student.last_name]} for student in group.students]
+        return {'students': students}, 200
+
+    def post(self, group_id):
+        """
+        Add a student to the group.
+
+        This endpoint allows you to add a student to the group.
+
+        ---
+        tags:
+          - Groups
+        parameters:
+          - name: group_id
+            in: path
+            type: integer
+            required: true
+            description: The ID of the group.
+          - name: student_id
+            in: query
+            type: integer
+            required: true
+            description: The ID of the student to be added to the group.
+        responses:
+          200:
+            description: Student added to the group successfully.
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  default: The student has been successfully added to the group.
+          404:
+            description: Student not found or Group not found.
+          409:
+            description: The student is already enrolled in the group.
+        """
+        group = Group.query.get(group_id)
+        student_id = request.args.get('student_id')
+        student = Student.query.filter_by(id=student_id).first()
+
+        if not student:
+            return {'message': 'Student not found.'}, 404
+
+        if not group:
+            return {'message': 'Group not found.'}, 404
+
+        if student in group.students:
+            return {'message': 'The student is already enrolled in the group.'}, 409
+
+        other_groups = Group.query.filter(Group.students.any(id=student_id), Group.id != group_id).all()
+        if other_groups:
+            return {'message': 'The student is already enrolled in another group.'}, 409
+
+        group.students.append(student)
+        db.session.commit()
+        return {'message': 'The student has been successfully added to the group.'}, 200
+
+
+class GroupDelStudents(Resource):
+    def delete(self, group_id, student_id):
+        """
+        Remove a student from the group.
+
+        This endpoint allows you to remove a student from the group.
+
+        ---
+        tags:
+          - Groups
+        parameters:
+          - name: group_id
+            in: path
+            type: integer
+            required: true
+            description: The ID of the group.
+          - name: student_id
+            in: path
+            type: integer
+            required: true
+            description: The ID of the student to be added to the group.
+        responses:
+          200:
+            description: Student removed from the group successfully.
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  default: The student has been successfully removed from the group.
+          404:
+            description: Student not found or Group not found.
+          409:
+            description: The student is not enrolled in the group.
+        """
+        student = Student.query.get(student_id)
+        group = Group.query.get(group_id)
+
+        if not student:
+            return {'message': 'Student not found.'}, 404
+
+        if not group:
+            return {'message': 'Group not found.'}, 404
+
+        if student not in group.students:
+            return {'message': 'The student is not enrolled in the group.'}, 409
+
+        group.students.remove(student)
+        db.session.commit()
+        return {'message': 'The student has been successfully removed from the group.'}, 200
 
 
 api.add_resource(Groups, '/groups', )
 api.add_resource(GroupId, '/groups/<int:group_id>')
-api.add_resource(GroupLessOrEqualStudents, '/groups/less-or-equal')
+api.add_resource(GroupToStudents, '/groups/<int:group_id>/students')
+api.add_resource(GroupDelStudents, '/groups/<int:group_id>/students/<int:student_id>')
