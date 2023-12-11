@@ -39,7 +39,7 @@ class Courses(Resource):
         courses = Course.query.all()
 
         if courses:
-            result = [[course.id, course.name] for course in courses]
+            result = [{course.id: course.name} for course in courses]
             return {'courses': result}, 200
         else:
             return {'message': 'No courses found.'}, 404
@@ -116,7 +116,7 @@ class CourseId(Resource):
         course = Course.query.get(course_id)
 
         if course:
-            result = [course.id, course.name]
+            result = {course.id: course.name}
             return result, 200
         else:
             return {'message': 'Course not found.'}, 404
@@ -214,7 +214,6 @@ class CourseToStudents(Resource):
           - name: name_course
             in: query
             type: string
-            required: true
             description: The name of the course.
         responses:
           200:

@@ -1,8 +1,6 @@
 import pytest
-import re
-
-from src.sql_folder.add_data import generate_groups, generate_courses
-from src.sql_folder.create_tables import db, Group, Student, Course, TestConfig
+from src.sql_folder.config import TestConfig
+from src.sql_folder.create_tables import db, Group, Student, Course
 from src.sql_folder.sql_file import create_app
 
 

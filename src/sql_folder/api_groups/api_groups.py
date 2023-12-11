@@ -40,7 +40,7 @@ class Groups(Resource):
         groups = Group.query.all()
 
         if groups:
-            result = [[group.id, group.name] for group in groups]
+            result = [{group.id: group.name} for group in groups]
             return {'groups': result}, 200
         else:
             return {'message': 'No groups found.'}, 404
@@ -117,7 +117,7 @@ class GroupId(Resource):
         group = Group.query.get(group_id)
 
         if group:
-            result = [group.id, group.name]
+            result = {group.id: group.name}
             return result, 200
         else:
             return {'message': 'Group not found.'}, 404
@@ -237,7 +237,7 @@ class GroupLessOrEqualStudents(Resource):
         groups = Group.query.join(Group.students).group_by(Group.id).having(func.count(Student.id) <= number).all()
 
         if groups:
-            return {'groups': [{'id': group.id, 'name': group.name} for group in groups]}, 200
+            return {'groups': [{group.id: group.name} for group in groups]}, 200
 
 
 api.add_resource(Groups, '/groups', )

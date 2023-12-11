@@ -1,12 +1,8 @@
-from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 
 
-# app = Flask(__name__)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vik:ubnfhf@localhost/task_10_sql'
 db = SQLAlchemy()
-# database_proxy = DatabaseProxy()
 
 
 student_course_association = db.Table(
@@ -18,7 +14,7 @@ student_course_association = db.Table(
 
 student_group_association = db.Table(
     'student_group_association',
-    db.Column('student_id', db.Integer, db.ForeignKey('Students.id')),
+    db.Column('student_id', db.Integer, db.ForeignKey('Students.id'), unique=True),
     db.Column('group_id', db.Integer, db.ForeignKey('Groups.id'))
 )
 
@@ -48,11 +44,3 @@ class Course(db.Model):
     name = db.Column(db.String(50), nullable=False, unique=True)
     description = db.Column(db.String(200))
     students = relationship('Student', secondary=student_course_association, back_populates='courses')
-
-
-class TestConfig:
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-
-
-class RealConfig:
-    SQLALCHEMY_DATABASE_URI = 'postgresql://vik:ubnfhf@localhost/task_10_sql'
