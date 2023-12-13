@@ -37,8 +37,8 @@ class Courses(Resource):
         courses = Course.query.all()
 
         if courses:
-            result = [{course.id: course.name} for course in courses]
-            return {'courses': result}, 200
+            result = [{'id': course.id, 'name': course.name} for course in courses]
+            return result, 200
 
     def post(self):
         """
@@ -112,7 +112,7 @@ class CourseId(Resource):
         course = Course.query.get(course_id)
 
         if course:
-            result = {course.id: course.name}
+            result = {'id': course.id, 'name': course.name}
             return result, 200
         else:
             return {'message': 'Course not found.'}, 404
@@ -237,8 +237,8 @@ class CourseToStudents(Resource):
         if not course:
             return {'message': 'Course not found.'}, 404
 
-        students = [{student.id: [student.first_name, student.last_name]} for student in course.students]
-        return {'students': students}, 200
+        students = [{'id': student.id, 'first_name': student.first_name, 'last_name': student.last_name} for student in course.students]
+        return students, 200
 
     def post(self, course_id):
         """

@@ -42,16 +42,17 @@ class Groups(Resource):
                         type: string
         """
         count = request.args.get('count', type=int)
+        query = db.session.query(Group.id, Group.name)
         groups = Group.query.all()
 
         if groups:
             if count:
-                filtered_groups = [group for group in groups if len(group.students) <= count]
-                result = [{group.id: group.name} for group in filtered_groups]
+                query = query.join(Group.students).group_by(Group.id).having(func.count(Student.id) <= count)
+                result = [{'id': group.id, 'name': group.name} for group in query]
             else:
-                result = [{group.id: group.name} for group in groups]
+                result = [{'id': group.id, 'name': group.name} for group in groups]
 
-            return {'groups': result}, 200
+            return result, 200
 
     def post(self):
         """
@@ -125,7 +126,7 @@ class GroupId(Resource):
         group = Group.query.get(group_id)
 
         if group:
-            result = {group.id: group.name}
+            result = {'id': group.id, 'name': group.name}
             return result, 200
         else:
             return {'message': 'Group not found.'}, 404
@@ -250,8 +251,8 @@ class GroupToStudents(Resource):
         if not group:
             return {'message': 'Group not found.'}, 404
 
-        students = [{student.id: [student.first_name, student.last_name]} for student in group.students]
-        return {'students': students}, 200
+        students = [{'id': student.id, 'first_name': student.first_name, 'last_name': student.last_name} for student in group.students]
+        return students, 200
 
     def post(self, group_id):
         """

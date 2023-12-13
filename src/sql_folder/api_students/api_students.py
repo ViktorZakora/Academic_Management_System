@@ -37,8 +37,8 @@ class Students(Resource):
         students = Student.query.all()
 
         if students:
-            result = [{student.id: [student.first_name, student.last_name]} for student in students]
-            return {'students': result}, 200
+            result = [{'id': student.id, 'first_name': student.first_name, 'last_name': student.last_name} for student in students]
+            return result, 200
 
     def post(self):
         """
@@ -118,7 +118,7 @@ class StudentId(Resource):
         student = Student.query.get(student_id)
 
         if student:
-            result = {student.id: [student.first_name, student.last_name]}
+            result = {'id': student.id, 'first_name': student.first_name, 'last_name': student.last_name}
             return result, 200
         else:
             return {'message': 'Student not found.'}, 404
@@ -250,8 +250,8 @@ class StudentToCourse(Resource):
         if not student:
             return {'message': 'Student not found.'}, 404
 
-        courses = [{course.id: [course.name, course.description]} for course in student.courses]
-        return {'courses': courses}, 200
+        courses = [{'id': course.id, 'name': course.name, 'description': course.description} for course in student.courses]
+        return courses, 200
 
 
 api.add_resource(Students, '/students', )
