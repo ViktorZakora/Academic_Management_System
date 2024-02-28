@@ -5,17 +5,19 @@ from src.sql_folder.create_tables import db, Group, Course, Student
 
 fake = Faker()
 
+
 def generate_groups():
     for _ in range(10):
         group_name = ''.join([
-            random.choice(string.ascii_uppercase),  # Велика літера
-            random.choice(string.ascii_uppercase),  # Велика літера
-            '-',  # Дефіс
-            str(random.randint(10, 99))  # 2 цифри
+            random.choice(string.ascii_uppercase),
+            random.choice(string.ascii_uppercase),
+            '-',
+            str(random.randint(10, 99))
         ])
         group = Group(name=group_name)
         db.session.add(group)
     db.session.commit()
+
 
 def generate_courses():
     course_names = ["Mathematics", "Biology", "Physics", "Chemistry", "History",
@@ -24,6 +26,7 @@ def generate_courses():
         course = Course(name=course_name)
         db.session.add(course)
     db.session.commit()
+
 
 def generate_students():
     first_names = [fake.first_name() for _ in range(20)]
@@ -36,6 +39,7 @@ def generate_students():
         db.session.add(student)
     db.session.commit()
 
+
 def assign_students_to_groups():
     groups = Group.query.all()
     students = Student.query.all()
@@ -45,6 +49,7 @@ def assign_students_to_groups():
         if group:
             group.students.append(student)
     db.session.commit()
+
 
 def assign_courses_to_students():
     students = Student.query.all()

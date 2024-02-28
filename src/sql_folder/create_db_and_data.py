@@ -13,7 +13,7 @@ def create_db_command():
     Create the database with groups, courses, and students.
     """
     with app.app_context():
-        db.create_all()  # створити усі таблиці
+        db.create_all()
         print('Tables are created.')
         generate_groups()
         generate_courses()
@@ -29,5 +29,5 @@ def delete_db_command():
     Delete the database with groups, courses, and students.
     """
     with app.app_context():
-        db.drop_all()  # видалити усі таблиці
+        db.drop_all()
         print('All tables are deleted.')
